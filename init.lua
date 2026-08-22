@@ -185,6 +185,13 @@ do
   --  See `:help hlsearch`
   vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 
+  -- Save the current file without leaving insert mode.
+  vim.keymap.set({ 'n', 'i', 'v' }, '<C-s>', '<cmd>write<CR>', { desc = 'Save current file' })
+
+  -- Move between paragraphs with Option/Alt-J and Option/Alt-K.
+  vim.keymap.set({ 'n', 'x', 'o' }, '<M-j>', '}', { desc = 'Next paragraph' })
+  vim.keymap.set({ 'n', 'x', 'o' }, '<M-k>', '{', { desc = 'Previous paragraph' })
+
   -- Diagnostic Config & Keymaps
   --  See `:help vim.diagnostic.Opts`
   vim.diagnostic.config {
@@ -218,6 +225,37 @@ do
   -- NOTE: This won't work in all terminal emulators/tmux/etc. Try your own mapping
   -- or just use <C-\><C-n> to exit terminal mode
   vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' })
+
+  -- Toggle a persistent terminal. Closing its window only hides the buffer, so
+  -- the shell session remains alive until the shell exits or Neovim closes.
+  local terminal_buf
+  local function toggle_terminal()
+    if terminal_buf and not vim.api.nvim_buf_is_valid(terminal_buf) then terminal_buf = nil end
+
+    if terminal_buf then
+      local terminal_win = vim.fn.bufwinid(terminal_buf)
+      if terminal_win ~= -1 then
+        if #vim.api.nvim_tabpage_list_wins(0) > 1 then
+          vim.api.nvim_win_close(terminal_win, true)
+        else
+          vim.api.nvim_win_set_buf(terminal_win, vim.api.nvim_create_buf(true, false))
+        end
+        return
+      end
+    end
+
+    vim.cmd 'botright 15new'
+    if terminal_buf then
+      vim.api.nvim_win_set_buf(0, terminal_buf)
+    else
+      vim.cmd 'terminal'
+      terminal_buf = vim.api.nvim_get_current_buf()
+      vim.bo[terminal_buf].bufhidden = 'hide'
+    end
+    vim.cmd 'startinsert'
+  end
+
+  vim.keymap.set({ 'n', 't' }, '<leader>tt', toggle_terminal, { desc = '[T]oggle persistent [T]erminal' })
 
   -- TIP: Disable arrow keys in normal mode
   -- vim.keymap.set('n', '<left>', '<cmd>echo "Use h to move!!"<CR>')
@@ -382,18 +420,13 @@ do
   -- change the command under that to load whatever the name of that colorscheme is.
   --
   -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`.
-  vim.pack.add { gh 'folke/tokyonight.nvim' }
-  ---@diagnostic disable-next-line: missing-fields
-  require('tokyonight').setup {
-    styles = {
-      comments = { italic = false }, -- Disable italics in comments
-    },
+  vim.pack.add { gh 'catppuccin/nvim' }
+  require('catppuccin').setup {
+    flavour = 'macchiato',
   }
 
   -- Load the colorscheme here.
-  -- Like many other themes, this one has different styles, and you could load
-  -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
-  vim.cmd.colorscheme 'tokyonight-night'
+  vim.cmd.colorscheme 'catppuccin-macchiato'
 
   -- Highlight todo, notes, etc in comments
   vim.pack.add { gh 'folke/todo-comments.nvim' }
@@ -695,7 +728,7 @@ do
     -- clangd = {},
     -- gopls = {},
     -- pyright = {},
-    -- rust_analyzer = {},
+    rust_analyzer = {},
     --
     -- Some languages (like typescript) have entire language plugins that can be useful:
     --    https://github.com/pmizio/typescript-tools.nvim
@@ -782,24 +815,14 @@ do
   vim.pack.add { gh 'stevearc/conform.nvim' }
   require('conform').setup {
     notify_on_error = false,
-    format_on_save = function(bufnr)
-      -- You can specify filetypes to autoformat on save here:
-      local enabled_filetypes = {
-        -- lua = true,
-        -- python = true,
-      }
-      if enabled_filetypes[vim.bo[bufnr].filetype] then
-        return { timeout_ms = 500 }
-      else
-        return nil
-      end
-    end,
+    format_on_save = { timeout_ms = 500 },
     default_format_opts = {
       lsp_format = 'fallback', -- Use external formatters if configured below, otherwise use LSP formatting. Set to `false` to disable LSP formatting entirely.
     },
     -- You can also specify external formatters in here.
     formatters_by_ft = {
-      -- rust = { 'rustfmt' },
+      lua = { 'stylua' },
+      rust = { 'rustfmt' },
       -- Conform can also run multiple formatters sequentially
       -- python = { "isort", "black" },
       --
@@ -855,7 +878,7 @@ do
       -- <c-k>: Toggle signature help
       --
       -- See `:help blink-cmp-config-keymap` for defining your own keymap
-      preset = 'default',
+      preset = 'enter',
 
       -- For more advanced Luasnip keymaps (e.g. selecting choice nodes, expansion) see:
       --    https://github.com/L3MON4D3/LuaSnip?tab=readme-ov-file#keymaps
@@ -868,6 +891,9 @@ do
     },
 
     completion = {
+      -- Show completion suggestions automatically while typing.
+      menu = { auto_show = true },
+
       -- By default, you may press `<c-space>` to show the documentation.
       -- Optionally, set `auto_show = true` to show the documentation after a delay.
       documentation = { auto_show = false, auto_show_delay_ms = 500 },
