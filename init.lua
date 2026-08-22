@@ -188,10 +188,6 @@ do
   -- Save the current file without leaving insert mode.
   vim.keymap.set({ 'n', 'i', 'v' }, '<C-s>', '<cmd>write<CR>', { desc = 'Save current file' })
 
-  -- Move between paragraphs with Option/Alt-J and Option/Alt-K.
-  vim.keymap.set({ 'n', 'x', 'o' }, '<M-j>', '}', { desc = 'Next paragraph' })
-  vim.keymap.set({ 'n', 'x', 'o' }, '<M-k>', '{', { desc = 'Previous paragraph' })
-
   -- Diagnostic Config & Keymaps
   --  See `:help vim.diagnostic.Opts`
   vim.diagnostic.config {
