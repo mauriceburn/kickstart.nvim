@@ -416,13 +416,13 @@ do
   -- change the command under that to load whatever the name of that colorscheme is.
   --
   -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`.
-  vim.pack.add { gh 'catppuccin/nvim' }
-  require('catppuccin').setup {
-    flavour = 'macchiato',
+  vim.pack.add { gh 'rose-pine/neovim' }
+  require('rose-pine').setup {
+    variant = 'main',
   }
 
   -- Load the colorscheme here.
-  vim.cmd.colorscheme 'catppuccin-macchiato'
+  vim.cmd.colorscheme 'rose-pine'
 
   -- Highlight todo, notes, etc in comments
   vim.pack.add { gh 'folke/todo-comments.nvim' }
