@@ -418,11 +418,16 @@ do
   -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`.
   vim.pack.add { gh 'catppuccin/nvim' }
   require('catppuccin').setup {
-    flavour = 'macchiato',
+    flavour = 'mocha',
+    color_overrides = {
+      mocha = {
+        base = '#081d30',
+      },
+    },
   }
 
   -- Load the colorscheme here.
-  vim.cmd.colorscheme 'catppuccin-macchiato'
+  vim.cmd.colorscheme 'catppuccin-mocha'
 
   -- Highlight todo, notes, etc in comments
   vim.pack.add { gh 'folke/todo-comments.nvim' }
