@@ -421,7 +421,7 @@ do
     flavour = 'mocha',
     color_overrides = {
       mocha = {
-        base = '#081d30',
+        base = '#071c34',
       },
     },
   }
