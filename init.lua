@@ -188,6 +188,10 @@ do
   -- Save the current file without leaving insert mode.
   vim.keymap.set({ 'n', 'i', 'v' }, '<C-s>', '<cmd>write<CR>', { desc = 'Save current file' })
 
+  -- Half-page movement with Alt/Option, following the j/k directions.
+  vim.keymap.set({ 'n', 'x' }, '<M-j>', '<C-d>', { desc = 'Scroll down half a page' })
+  vim.keymap.set({ 'n', 'x' }, '<M-k>', '<C-u>', { desc = 'Scroll up half a page' })
+
   -- Diagnostic Config & Keymaps
   --  See `:help vim.diagnostic.Opts`
   vim.diagnostic.config {
