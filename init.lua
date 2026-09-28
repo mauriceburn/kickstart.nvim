@@ -118,6 +118,12 @@ do
   -- Don't show the mode, since it's already in the status line
   vim.o.showmode = false
 
+  -- Hide the command line until it is needed (for example, after pressing `:`).
+  vim.o.cmdheight = 0
+
+  -- Default scroll distance (explicit mappings below also survive window resizing).
+  vim.o.scroll = 10
+
   -- Sync clipboard between OS and Neovim.
   --  Schedule the setting after `UiEnter` because it can increase startup-time.
   --  Remove this option if you want your OS clipboard to remain independent.
@@ -185,12 +191,15 @@ do
   --  See `:help hlsearch`
   vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 
-  -- Save the current file without leaving insert mode.
-  vim.keymap.set({ 'n', 'i', 'v' }, '<C-s>', '<cmd>write<CR>', { desc = 'Save current file' })
+  -- Save the current file and return to normal mode.
+  vim.keymap.set('n', '<C-s>', '<cmd>write<CR>', { desc = 'Save current file' })
+  vim.keymap.set({ 'i', 'v' }, '<C-s>', '<Esc><cmd>write<CR>', { desc = 'Save current file' })
 
-  -- Half-page movement with Alt/Option, following the j/k directions.
-  vim.keymap.set({ 'n', 'x' }, '<M-j>', '<C-d>', { desc = 'Scroll down half a page' })
-  vim.keymap.set({ 'n', 'x' }, '<M-k>', '<C-u>', { desc = 'Scroll up half a page' })
+  -- Scroll 10 lines with Ctrl or Alt/Option, following the j/k directions.
+  vim.keymap.set({ 'n', 'x' }, '<C-d>', '10<C-d>', { desc = 'Scroll down 10 lines' })
+  vim.keymap.set({ 'n', 'x' }, '<C-u>', '10<C-u>', { desc = 'Scroll up 10 lines' })
+  vim.keymap.set({ 'n', 'x' }, '<M-j>', '10<C-d>', { desc = 'Scroll down 10 lines' })
+  vim.keymap.set({ 'n', 'x' }, '<M-k>', '10<C-u>', { desc = 'Scroll up 10 lines' })
 
   -- Diagnostic Config & Keymaps
   --  See `:help vim.diagnostic.Opts`
@@ -226,36 +235,41 @@ do
   -- or just use <C-\><C-n> to exit terminal mode
   vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' })
 
-  -- Toggle a persistent terminal. Closing its window only hides the buffer, so
-  -- the shell session remains alive until the shell exits or Neovim closes.
-  local terminal_buf
-  local function toggle_terminal()
-    if terminal_buf and not vim.api.nvim_buf_is_valid(terminal_buf) then terminal_buf = nil end
+  -- Toggle persistent horizontal and vertical terminals. Closing a terminal's
+  -- window only hides its buffer, so both shell sessions can remain alive and
+  -- visible at the same time.
+  local function terminal_toggle(split_command)
+    local terminal_buf
 
-    if terminal_buf then
-      local terminal_win = vim.fn.bufwinid(terminal_buf)
-      if terminal_win ~= -1 then
-        if #vim.api.nvim_tabpage_list_wins(0) > 1 then
-          vim.api.nvim_win_close(terminal_win, true)
-        else
-          vim.api.nvim_win_set_buf(terminal_win, vim.api.nvim_create_buf(true, false))
+    return function()
+      if terminal_buf and not vim.api.nvim_buf_is_valid(terminal_buf) then terminal_buf = nil end
+
+      if terminal_buf then
+        local terminal_win = vim.fn.bufwinid(terminal_buf)
+        if terminal_win ~= -1 then
+          if #vim.api.nvim_tabpage_list_wins(0) > 1 then
+            vim.api.nvim_win_close(terminal_win, true)
+          else
+            vim.api.nvim_win_set_buf(terminal_win, vim.api.nvim_create_buf(true, false))
+          end
+          return
         end
-        return
       end
-    end
 
-    vim.cmd 'botright 15new'
-    if terminal_buf then
-      vim.api.nvim_win_set_buf(0, terminal_buf)
-    else
-      vim.cmd 'terminal'
-      terminal_buf = vim.api.nvim_get_current_buf()
-      vim.bo[terminal_buf].bufhidden = 'hide'
+      vim.cmd(split_command)
+      if terminal_buf then
+        vim.api.nvim_win_set_buf(0, terminal_buf)
+      else
+        vim.cmd 'terminal'
+        terminal_buf = vim.api.nvim_get_current_buf()
+        vim.bo[terminal_buf].bufhidden = 'hide'
+      end
+      vim.cmd 'startinsert'
     end
-    vim.cmd 'startinsert'
   end
 
-  vim.keymap.set({ 'n', 't' }, '<leader>tt', toggle_terminal, { desc = '[T]oggle persistent [T]erminal' })
+  vim.keymap.set({ 'n', 't' }, '<leader>tt', terminal_toggle 'botright 15new', { desc = '[T]oggle horizontal [T]erminal' })
+  vim.keymap.set({ 'n', 't' }, '<leader>tv', terminal_toggle 'botright 80vnew', { desc = '[T]oggle [V]ertical terminal' })
 
   -- TIP: Disable arrow keys in normal mode
   -- vim.keymap.set('n', '<left>', '<cmd>echo "Use h to move!!"<CR>')
@@ -730,10 +744,18 @@ do
   --  See `:help lsp-config` for information about keys and how to configure
   ---@type table<string, vim.lsp.Config>
   local servers = {
-    -- clangd = {},
+    clangd = {},
     -- gopls = {},
     -- pyright = {},
-    rust_analyzer = {},
+    rust_analyzer = {
+      settings = {
+        ['rust-analyzer'] = {
+          cargo = {
+            target = 'aarch64-unknown-linux-gnu',
+          },
+        },
+      },
+    },
     --
     -- Some languages (like typescript) have entire language plugins that can be useful:
     --    https://github.com/pmizio/typescript-tools.nvim
@@ -801,6 +823,7 @@ do
   local ensure_installed = vim.tbl_keys(servers or {})
   vim.list_extend(ensure_installed, {
     -- You can add other tools here that you want Mason to install
+    'prettier',
   })
 
   require('mason-tool-installer').setup { ensure_installed = ensure_installed }
@@ -824,10 +847,23 @@ do
     default_format_opts = {
       lsp_format = 'fallback', -- Use external formatters if configured below, otherwise use LSP formatting. Set to `false` to disable LSP formatting entirely.
     },
+    formatters = {
+      djlint = {
+        cwd = require('conform.util').root_file { 'djlint.toml', '.djlint.toml', '.djlintrc', 'pyproject.toml' },
+        append_args = { '--stdin-filename', '$FILENAME' },
+      },
+    },
     -- You can also specify external formatters in here.
     formatters_by_ft = {
       lua = { 'stylua' },
       rust = { 'rustfmt' },
+      css = { 'prettier' },
+      -- Askama templates use HTML/Jinja syntax.
+      html = { 'djlint' },
+      htmldjango = { 'djlint' },
+      jinja = { 'djlint' },
+      jinja2 = { 'djlint' },
+      askama = { 'djlint' },
       -- Conform can also run multiple formatters sequentially
       -- python = { "isort", "black" },
       --
@@ -857,6 +893,42 @@ do
   --
   -- vim.pack.add { gh 'rafamadriz/friendly-snippets' }
   -- require('luasnip.loaders.from_vscode').lazy_load()
+
+  -- [[ AI Code Completion ]]
+  -- Minuet is disabled; keep its settings here for optional re-enabling.
+  --[[
+  vim.pack.add { gh 'milanglacier/minuet-ai.nvim' }
+  require('minuet').setup {
+    provider = 'openai_fim_compatible',
+    n_completions = 1,
+    context_window = 4096,
+    request_timeout = 10,
+    blink = { enable_auto_complete = false },
+    virtualtext = {
+      auto_trigger_ft = { '*' },
+      show_on_completion_menu = true,
+      keymap = {
+        accept = '<C-l>',
+        next = '<F6>',
+        prev = '<S-F6>',
+        dismiss = '<C-e>',
+      },
+    },
+    provider_options = {
+      openai_fim_compatible = {
+        api_key = function() return 'ollama' end,
+        name = 'Ollama',
+        end_point = 'http://localhost:11434/v1/completions',
+        model = 'qwen2.5-coder-autocomplete',
+        optional = {
+          max_tokens = 64,
+          top_p = 0.9,
+        },
+      },
+    },
+  }
+
+  --]]
 
   -- [[ Autocomplete Engine ]]
   vim.pack.add { { src = gh 'saghen/blink.cmp', version = vim.version.range '1.*' } }
@@ -898,6 +970,9 @@ do
     completion = {
       -- Show completion suggestions automatically while typing.
       menu = { auto_show = true },
+
+      -- Avoid firing an extra completion request whenever entering Insert mode.
+      trigger = { prefetch_on_insert = false },
 
       -- By default, you may press `<c-space>` to show the documentation.
       -- Optionally, set `auto_show = true` to show the documentation after a delay.
@@ -1003,7 +1078,7 @@ do
   -- require 'kickstart.plugins.debug'
   -- require 'kickstart.plugins.indent_line'
   -- require 'kickstart.plugins.lint'
-  -- require 'kickstart.plugins.autopairs'
+  require 'kickstart.plugins.autopairs'
   -- require 'kickstart.plugins.neo-tree'
   -- require 'kickstart.plugins.gitsigns' -- adds gitsigns recommended keymaps
 
